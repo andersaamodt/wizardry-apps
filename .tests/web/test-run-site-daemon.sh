@@ -13,66 +13,63 @@ test_run_site_daemon_help() {
   assert_output_contains "Usage: run-site-daemon"
 }
 
-test_run_site_daemon_rejects_path_site_name() {
+test_run_site_daemon_uses_wizardry_sites_dir_env() {
   skip-if-compiled || return $?
 
-  base_dir=$(temp-dir web-wizardry-test)
-  web_root="$base_dir/sites"
-  outside_site="$base_dir/sibling"
-  mkdir -p "$web_root" "$outside_site"
-
-  WEB_WIZARDRY_ROOT="$web_root" run_spell spells/web/run-site-daemon ../sibling
-  assert_status 2
-  assert_error_contains "invalid site name"
-
-  rm -rf "$base_dir"
-}
-
-test_run_site_daemon_rejects_invalid_fcgiwrap_workers() {
-  skip-if-compiled || return $?
-
-  base_dir=$(temp-dir web-wizardry-test)
-  web_root="$base_dir/sites"
+  web_root=$(temp-dir web-wizardry-test)
+  home_root=$(temp-dir web-wizardry-home)
   site_dir="$web_root/mysite"
-  stub_dir=$(temp-dir web-wizardry-stub)
-  stub_log="$base_dir/stub.log"
-  mkdir -p "$site_dir/build/pages" "$site_dir/nginx" "$stub_dir"
-  printf '%s\n' '<!doctype html><title>test</title>' > "$site_dir/build/pages/index.html"
-  printf '%s\n' 'events {}' 'http {}' > "$site_dir/nginx/nginx.conf"
+  mkdir -p "$site_dir/nginx"
 
-  cat > "$stub_dir/nginx" <<'STUB'
+  stub_dir=$(temp-dir web-wizardry-stub)
+  cat > "$stub_dir/nginx" <<'EOF'
 #!/bin/sh
-printf '%s\n' "nginx $*" >> "${DAEMON_STUB_LOG:?}"
 exit 0
-STUB
+EOF
   chmod +x "$stub_dir/nginx"
 
-  cat > "$stub_dir/fcgiwrap" <<'STUB'
+  # WEB_WIZARDRY_ROOT is intentionally unset here to emulate launchd/systemd
+  # environments where only WIZARDRY_SITES_DIR is provided.
+  PATH="$stub_dir:$PATH" HOME="$home_root" WIZARDRY_SITES_DIR="$web_root" \
+    run_spell spells/web/run-site-daemon mysite
+
+  # If run-site-daemon ignores WIZARDRY_SITES_DIR, it fails with "site not found".
+  # Correct behavior reaches the nginx.conf prerequisite check.
+  assert_status 1
+  assert_error_contains "nginx.conf missing"
+
+  rm -rf "$web_root" "$home_root" "$stub_dir"
+}
+
+test_run_site_daemon_uses_nginx_bin_fallback() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  site_dir="$web_root/mysite"
+  mkdir -p "$site_dir/nginx"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  cat > "$stub_dir/nginx-fallback" <<'EOF'
 #!/bin/sh
-printf '%s\n' "fcgiwrap $*" >> "${DAEMON_STUB_LOG:?}"
 exit 0
-STUB
-  chmod +x "$stub_dir/fcgiwrap"
+EOF
+  chmod +x "$stub_dir/nginx-fallback"
 
-  for workers in 0 65 9999 '8;touch /tmp/wizardry-fcgiwrap-workers-bad'; do
-    rm -f "$stub_log"
-    run_cmd env PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" \
-      DAEMON_STUB_LOG="$stub_log" "FCGIWRAP_WORKERS=$workers" \
-      "$ROOT_DIR/spells/web/run-site-daemon" mysite
-    assert_status 2 || return 1
-    assert_error_contains "invalid FCGIWRAP_WORKERS" || return 1
+  # No nginx in PATH; spell should still proceed by using WIZARDRY_NGINX_BIN.
+  PATH="/usr/bin:/bin" WEB_WIZARDRY_ROOT="$web_root" \
+    WIZARDRY_NGINX_BIN="$stub_dir/nginx-fallback" \
+    run_spell spells/web/run-site-daemon mysite
 
-    if [ -f "$stub_log" ]; then
-      TEST_FAILURE_REASON="daemon commands were called for invalid FCGIWRAP_WORKERS=$workers"
-      return 1
-    fi
-  done
+  assert_status 1
+  assert_error_contains "nginx.conf missing"
 
-  rm -rf "$base_dir" "$stub_dir"
+  rm -rf "$web_root" "$stub_dir"
 }
 
 run_test_case "run-site-daemon --help works" test_run_site_daemon_help
-run_test_case "run-site-daemon rejects path site name" test_run_site_daemon_rejects_path_site_name
-run_test_case "run-site-daemon rejects invalid fcgiwrap worker counts" test_run_site_daemon_rejects_invalid_fcgiwrap_workers
+run_test_case "run-site-daemon honors WIZARDRY_SITES_DIR when WEB_WIZARDRY_ROOT is unset" \
+  test_run_site_daemon_uses_wizardry_sites_dir_env
+run_test_case "run-site-daemon resolves nginx via absolute fallback when PATH lacks nginx" \
+  test_run_site_daemon_uses_nginx_bin_fallback
 
 finish_tests

@@ -7,6 +7,37 @@ while [ ! -f "$test_root/spells/.imps/test/test-bootstrap" ] && [ "$test_root" !
 done
 . "$test_root/spells/.imps/test/test-bootstrap"
 
+resolve_build_template_root() {
+  root_parent=$(dirname "$ROOT_DIR")
+  for candidate in \
+    "$ROOT_DIR/.templates" \
+    "$ROOT_DIR/templates/web" \
+    "$ROOT_DIR/web" \
+    "$ROOT_DIR/spells/web" \
+    "$root_parent/git/wizardry-apps/templates/web" \
+    "$root_parent/git/wizardry-apps/web" \
+    "$HOME/git/wizardry-apps/templates/web" \
+    "$HOME/git/wizardry-apps/web"
+  do
+    [ -d "$candidate" ] || continue
+    for template_path in "$candidate"/*; do
+      [ -d "$template_path/pages" ] || continue
+      printf '%s\n' "$candidate"
+      return 0
+    done
+  done
+  return 1
+}
+
+build_template_name_from_path() {
+  template_path=$1
+  template_name=$(basename "$template_path")
+  case "$template_name" in
+    web-demo) printf '%s\n' demo ;;
+    *) printf '%s\n' "$template_name" ;;
+  esac
+}
+
 make_build_stub_dir() {
   stub_dir=$(temp-dir web-build-stubs)
 
@@ -41,6 +72,12 @@ if [ -z "$out_file" ]; then
     cat
   fi
   exit 0
+fi
+
+if [ -n "${PANDOC_COUNT_FILE-}" ]; then
+  count=$(cat "$PANDOC_COUNT_FILE" 2>/dev/null || printf '0')
+  count=$((count + 1))
+  printf '%s\n' "$count" > "$PANDOC_COUNT_FILE"
 fi
 
 title=${in_file##*/}
@@ -116,8 +153,9 @@ test_build_help() {
 test_build_generates_html_for_every_template() {
   skip-if-compiled || return $?
 
-  if [ ! -d "$ROOT_DIR/templates/web" ]; then
-    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/templates/web"
+  template_root=$(resolve_build_template_root 2>/dev/null || printf '')
+  if [ -z "$template_root" ] || [ ! -d "$template_root" ]; then
+    TEST_FAILURE_REASON="template directory missing"
     return 1
   fi
 
@@ -125,10 +163,10 @@ test_build_generates_html_for_every_template() {
   stub_dir=$(make_build_stub_dir)
 
   found_template=0
-  for template_path in "$ROOT_DIR/templates/web"/*; do
+  for template_path in "$template_root"/*; do
     [ -d "$template_path" ] || continue
     found_template=1
-    template=$(basename "$template_path")
+    template=$(build_template_name_from_path "$template_path")
     site_name="build-${template}"
     site_dir="$test_web_root/$site_name"
 
@@ -172,7 +210,7 @@ test_build_generates_html_for_every_template() {
   done
 
   if [ "$found_template" -ne 1 ]; then
-    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/templates/web"
+    TEST_FAILURE_REASON="no templates found in $template_root"
     rm -rf "$test_web_root" "$stub_dir"
     return 1
   fi
@@ -347,90 +385,364 @@ EOF
   rm -rf "$test_web_root" "$stub_dir"
 }
 
-test_build_prunes_stale_html_for_removed_pages() {
+test_build_honors_external_build_dir() {
   skip-if-compiled || return $?
 
   test_web_root=$(temp-dir web-build-root)
   stub_dir=$(make_build_stub_dir)
-  site_name="stalepages"
+  site_name="external-build-dir"
+  site_dir="$test_web_root/$site_name"
+  build_dir="$test_web_root/.sitedata/$site_name-preview-build"
+
+  WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template "$site_name" demo
+  assert_success || return 1
+
+  printf '%s\n' "build-dir=$build_dir" >> "$site_dir/site.conf"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "$site_name" --full
+  assert_success || return 1
+
+  [ -f "$build_dir/pages/index.html" ] || {
+    TEST_FAILURE_REASON="build should write index.html to configured external build-dir"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+
+  if [ -e "$site_dir/build/pages/index.html" ]; then
+    TEST_FAILURE_REASON="build should not recreate site-local build output when build-dir is external"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
+test_build_honors_external_page_and_static_dirs() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-build-root)
+  stub_dir=$(make_build_stub_dir)
+  site_name="external-inputs"
+  site_dir="$test_web_root/$site_name"
+  pages_dir=$(temp-dir web-build-pages)
+  static_dir=$(temp-dir web-build-static)
+  build_dir=$(temp-dir web-build-output)
+
+  mkdir -p "$site_dir/site/includes" "$site_dir/site/static" "$pages_dir" "$static_dir"
+  cat > "$site_dir/site.conf" <<EOF
+site-name=$site_name
+template=minimal
+pages-dir=$pages_dir
+static-dir=$static_dir
+build-dir=$build_dir
+EOF
+  cat > "$pages_dir/index.md" <<'EOF'
+---
+title: External Input
+---
+
+External pages root body.
+EOF
+  printf '%s\n' 'body { color: #123456; }' > "$static_dir/style.css"
+  cat > "$site_dir/pre-build" <<'EOF'
+#!/bin/sh
+set -eu
+{
+  printf 'pages=%s\n' "${WIZARDRY_PAGES_DIR:?}"
+  printf 'static=%s\n' "${WIZARDRY_STATIC_DIR:?}"
+  printf 'build=%s\n' "${WIZARDRY_BUILD_DIR:?}"
+  printf 'in_progress=%s\n' "${WIZARDRY_BUILD_IN_PROGRESS:?}"
+} > "$WIZARDRY_SITES_DIR/$WIZARDRY_SITE_NAME/pre-build.env"
+EOF
+  chmod +x "$site_dir/pre-build"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "$site_name"
+  assert_success || return 1
+
+  [ -f "$build_dir/pages/index.html" ] || {
+    TEST_FAILURE_REASON="external pages-dir did not produce index.html"
+    rm -rf "$test_web_root" "$stub_dir" "$pages_dir" "$static_dir" "$build_dir"
+    return 1
+  }
+  grep -Fq 'External pages root body.' "$build_dir/pages/index.html" || {
+    TEST_FAILURE_REASON="external pages-dir content was not rendered"
+    rm -rf "$test_web_root" "$stub_dir" "$pages_dir" "$static_dir" "$build_dir"
+    return 1
+  }
+  grep -Fq 'color: #123456' "$build_dir/static/style.css" || {
+    TEST_FAILURE_REASON="external static-dir content was not copied"
+    rm -rf "$test_web_root" "$stub_dir" "$pages_dir" "$static_dir" "$build_dir"
+    return 1
+  }
+  grep -Fq "pages=$pages_dir" "$site_dir/pre-build.env" &&
+    grep -Fq "static=$static_dir" "$site_dir/pre-build.env" &&
+    grep -Fq "build=$build_dir" "$site_dir/pre-build.env" &&
+    grep -Fq 'in_progress=1' "$site_dir/pre-build.env" || {
+    TEST_FAILURE_REASON="pre-build did not receive explicit build path environment"
+    rm -rf "$test_web_root" "$stub_dir" "$pages_dir" "$static_dir" "$build_dir"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$stub_dir" "$pages_dir" "$static_dir" "$build_dir"
+}
+
+test_build_adds_cache_bust_for_local_static_assets() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-build-root)
+  stub_dir=$(make_build_stub_dir)
+  site_name="cachebust"
   site_dir="$test_web_root/$site_name"
 
   WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template "$site_name" demo
   assert_success
 
-  cat > "$site_dir/site/pages/tasks.md" <<'EOF'
----
-title: Tasks
----
+  cat > "$site_dir/site/pages/cache-test.md" <<'EOF'
+# Cache Test
 
-Tasks body.
+<script src="/static/app.js"></script>
+<script src="/static/already.js?v=keep"></script>
+<script src="/static/vendor/citrine-nostr-web.js?v=keep"></script>
+<link rel="stylesheet" href="/static/style.css" />
 EOF
 
   PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
     run_spell spells/web/build "$site_name" --full
   assert_success
 
-  [ -f "$site_dir/build/pages/tasks.html" ] || {
-    TEST_FAILURE_REASON="expected build/pages/tasks.html after initial build"
+  html_file="$site_dir/build/pages/cache-test.html"
+  [ -f "$html_file" ] || {
+    TEST_FAILURE_REASON="cache-test page should be built"
     rm -rf "$test_web_root" "$stub_dir"
     return 1
   }
 
-  rm -f "$site_dir/site/pages/tasks.md"
-
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
-    run_spell spells/web/build "$site_name"
-  assert_success
-
-  [ ! -f "$site_dir/build/pages/tasks.html" ] || {
-    TEST_FAILURE_REASON="stale build/pages/tasks.html should be removed when source markdown is deleted"
+  if ! grep -Eq 'src="/static/app\.js\?v=[0-9]+"' "$html_file"; then
+    TEST_FAILURE_REASON="build should append cache bust token to local static JS"
     rm -rf "$test_web_root" "$stub_dir"
     return 1
-  }
+  fi
+
+  if ! grep -Eq 'href="/static/style\.css\?v=[0-9]+"' "$html_file"; then
+    TEST_FAILURE_REASON="build should append cache bust token to local static CSS"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  if ! grep -Eq 'src="/static/already\.js\?v=[0-9]+"' "$html_file"; then
+    TEST_FAILURE_REASON="build should normalize existing static cache tokens"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  if ! grep -Eq 'src="/static/vendor/citrine-nostr-web\.js\?v=[0-9]+"' "$html_file"; then
+    TEST_FAILURE_REASON="build should normalize nested static vendor cache tokens"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  html_mode=$(ls -l "$html_file" | awk '{print $1}')
+  case "$html_mode" in
+    ????r*) ;;
+    *)
+      TEST_FAILURE_REASON="cache-busted HTML should remain group-readable, got mode $html_mode"
+      rm -rf "$test_web_root" "$stub_dir"
+      return 1
+      ;;
+  esac
 
   rm -rf "$test_web_root" "$stub_dir"
 }
 
-test_build_rejects_site_path_traversal() {
+test_build_incremental_uses_content_signatures() {
   skip-if-compiled || return $?
 
   test_web_root=$(temp-dir web-build-root)
   stub_dir=$(make_build_stub_dir)
-  outside_dir="$(dirname "$test_web_root")/wizardry-build-escape-$$"
-  rm -rf "$outside_dir"
+  site_name="sigbuild"
+  site_dir="$test_web_root/$site_name"
+  pandoc_count_file="$test_web_root/pandoc-count"
 
-  mkdir -p "$outside_dir/site/pages" "$outside_dir/site/static" "$outside_dir/cgi"
-  printf '# Outside\n' > "$outside_dir/site/pages/index.md"
-  cat > "$outside_dir/cgi/pre-build" <<EOF
-#!/bin/sh
-set -eu
-printf 'ran\n' > "$outside_dir/hook-ran"
+  mkdir -p "$site_dir/site/pages" "$site_dir/site/includes" "$site_dir/site/static"
+  cat > "$site_dir/site.conf" <<'EOF'
+site-name=sigbuild
+template=demo
+domain=localhost
+https=false
 EOF
-  chmod +x "$outside_dir/cgi/pre-build"
+  cat > "$site_dir/site/pages/one.md" <<'EOF'
+# One
+EOF
+  cat > "$site_dir/site/pages/two.md" <<'EOF'
+# Two
+EOF
+  cat > "$site_dir/site/includes/nav.md" <<'EOF'
+<nav>first nav</nav>
+EOF
+  cat > "$site_dir/site/static/style.css" <<'EOF'
+body { color: black; }
+EOF
+
+  : > "$pandoc_count_file"
+  PANDOC_COUNT_FILE="$pandoc_count_file" PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "$site_name" --full
+  assert_success
+
+  printf '0\n' > "$pandoc_count_file"
+  cat > "$site_dir/site/static/style.css" <<'EOF'
+body { color: green; }
+EOF
+  PANDOC_COUNT_FILE="$pandoc_count_file" PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "$site_name"
+  assert_success
+  static_only_count=$(cat "$pandoc_count_file" 2>/dev/null || printf '0')
+  if [ "$static_only_count" -ne 0 ]; then
+    TEST_FAILURE_REASON="static-only incremental build should not re-run pandoc, got $static_only_count runs"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  printf '0\n' > "$pandoc_count_file"
+  cat > "$site_dir/site/includes/nav.md" <<'EOF'
+<nav>second nav</nav>
+EOF
+  PANDOC_COUNT_FILE="$pandoc_count_file" PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "$site_name"
+  assert_success
+  nav_count=$(cat "$pandoc_count_file" 2>/dev/null || printf '0')
+  if [ "$nav_count" -ne 2 ]; then
+    TEST_FAILURE_REASON="nav include change should re-run pandoc for both pages, got $nav_count runs"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if ! grep -F 'second nav' "$site_dir/build/pages/one.html" >/dev/null 2>&1 ||
+     ! grep -F 'second nav' "$site_dir/build/pages/two.html" >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="nav include change should update every built page"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
+test_build_rejects_path_shaped_site_name() {
+  skip-if-compiled || return $?
+
+  tmpdir=$(make_tempdir)
+  web_root="$tmpdir/sites"
+  escape_dir="$tmpdir/escape"
+  mkdir -p "$web_root" "$escape_dir/site/pages"
+  cat > "$escape_dir/site.conf" <<'EOF'
+template=demo
+EOF
+  cat > "$escape_dir/site/pages/index.md" <<'EOF'
+# Escape
+EOF
+
+  stub_dir=$(make_build_stub_dir)
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build ../escape --full
+
+  assert_failure || return 1
+  assert_error_contains "invalid site name" || return 1
+  if [ -d "$escape_dir/build" ]; then
+    TEST_FAILURE_REASON="build created output outside WEB_WIZARDRY_ROOT"
+    return 1
+  fi
+
+  rm -rf "$tmpdir" "$stub_dir"
+}
+
+test_build_rejects_imported_domain_renderer_injection() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-build-root)
+  stub_dir=$(make_build_stub_dir)
+  site_name="build-bad-domain"
+  site_dir="$test_web_root/$site_name"
+
+  mkdir -p "$site_dir/site/pages/posts"
+  cat > "$site_dir/site.conf" <<'EOF'
+site-name=build-bad-domain
+template=blog
+domain=example.com;include=/tmp/evil.conf
+https=false
+EOF
+  mkdir -p "$site_dir/site/pages/posts"
+  cat > "$site_dir/site/pages/posts/bad-domain.md" <<'EOF'
+---
+title: Bad Domain
+published_at: 2026-01-01T00:00:00Z
+---
+
+Body
+EOF
 
   PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
-    run_spell spells/web/build "../$(basename "$outside_dir")" --full
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
-    return 1
-  }
+    run_spell spells/web/build "$site_name" --full
+  assert_failure || return 1
+  assert_error_contains "invalid domain" || return 1
 
-  [ ! -f "$outside_dir/hook-ran" ] || {
-    TEST_FAILURE_REASON="build ran a pre-build hook outside WEB_WIZARDRY_ROOT"
-    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+  if [ -f "$site_dir/build/robots.txt" ] &&
+     grep -F "evil.conf" "$site_dir/build/robots.txt" >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="build wrote forged robots.txt text from invalid domain"
     return 1
-  }
+  fi
 
-  rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
+test_build_rejects_imported_https_setting() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-build-root)
+  stub_dir=$(make_build_stub_dir)
+  site_name="build-bad-https"
+  site_dir="$test_web_root/$site_name"
+
+  mkdir -p "$site_dir/site/pages/posts"
+  cat > "$site_dir/site.conf" <<'EOF'
+site-name=build-bad-https
+template=blog
+domain=localhost
+https=true; forged
+EOF
+  mkdir -p "$site_dir/site/pages/posts"
+  cat > "$site_dir/site/pages/posts/bad-https.md" <<'EOF'
+---
+title: Bad HTTPS
+published_at: 2026-01-01T00:00:00Z
+---
+
+Body
+EOF
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "$site_name" --full
+  assert_failure || return 1
+  assert_error_contains "invalid https setting" || return 1
+
+  rm -rf "$test_web_root" "$stub_dir"
 }
 
 run_test_case "build --help works" test_build_help
 run_test_case "build generates output for every template" test_build_generates_html_for_every_template
 run_test_case "build cache falls back to site data cache" test_build_cache_falls_back_to_site_data_only
 run_test_case "build runs site pre-build hook" test_build_runs_site_pre_build_hook
-run_test_case "build prunes stale html for removed pages" test_build_prunes_stale_html_for_removed_pages
-run_test_case "build rejects site path traversal" test_build_rejects_site_path_traversal
-if [ -d "$ROOT_DIR/templates/web/blog" ]; then
+run_test_case "build honors external build-dir" test_build_honors_external_build_dir
+run_test_case "build honors external page and static dirs" \
+  test_build_honors_external_page_and_static_dirs
+run_test_case "build appends cache bust tokens to local static assets" test_build_adds_cache_bust_for_local_static_assets
+run_test_case "build incremental uses content signatures" test_build_incremental_uses_content_signatures
+run_test_case "build rejects path-shaped site names" test_build_rejects_path_shaped_site_name
+run_test_case "build rejects imported domain renderer injection" \
+  test_build_rejects_imported_domain_renderer_injection
+run_test_case "build rejects imported https setting" \
+  test_build_rejects_imported_https_setting
+if [ -d "$ROOT_DIR/web/blog" ]; then
   run_test_case "blog build renders nested posts and feeds" test_build_blog_generates_posts_and_feeds
 fi
 

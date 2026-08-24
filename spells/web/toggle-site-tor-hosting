@@ -28,37 +28,59 @@ if [ -z "$site_name" ]; then
   die 2 "toggle-site-tor-hosting: SITENAME required"
 fi
 case "$site_name" in
-  ""|*[!a-zA-Z0-9_-]*)
-    die 2 "toggle-site-tor-hosting: invalid site name (use alphanumeric, dash, underscore only)"
+  .|..|*[!a-zA-Z0-9._-]*)
+    die 2 "toggle-site-tor-hosting: invalid site name"
     ;;
 esac
 
-WEB_ROOT="${WIZARDRY_SITES_DIR}"
-SITES_DIR="$WEB_ROOT"
-SITE_DIR="$SITES_DIR/$site_name"
+web_root="${WIZARDRY_SITES_DIR}"
+sites_dir="$web_root"
+site_dir="$sites_dir/$site_name"
 
-if [ ! -d "$SITE_DIR" ]; then
+if [ ! -d "$site_dir" ]; then
   die "toggle-site-tor-hosting: site '$site_name' not found"
 fi
 
+valid_port() {
+  port_value=$1
+  case "$port_value" in
+    ''|*[!0-9]*|??????*)
+      return 1
+      ;;
+  esac
+  [ "$port_value" -ge 1 ] && [ "$port_value" -le 65535 ]
+}
+
+toggle_site_tor_hidden_service_line_matches_site() {
+  line=$1
+  case "$line" in
+    HiddenServiceDir*)
+      hidden_service_match_dir=$(printf '%s\n' "$line" | awk '{print $2; exit}')
+      hidden_service_match_dir=${hidden_service_match_dir%/}
+      [ "${hidden_service_match_dir##*/}" = "$site_name" ]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 # Get the site's port
-port=$(config-get "$SITE_DIR/site.conf" port 2>/dev/null || echo "8080")
-case "$port" in
-  ""|*[!0-9]*)
-    die 2 "toggle-site-tor-hosting: port must be numeric"
-    ;;
-esac
-if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
-  die 2 "toggle-site-tor-hosting: port must be between 1 and 65535"
+port=$(config-get "$site_dir/site.conf" port 2>/dev/null || echo "8080")
+if ! valid_port "$port"; then
+  die 2 "toggle-site-tor-hosting: invalid port"
 fi
 
 # Only check tor dependencies when ENABLING (not when disabling)
 # Check if this site already has a hidden service configured
 tor_config_path=$(torrc-path) || exit 1
 hs_configured=0
-if grep -q "^HiddenServiceDir.*${site_name}" "$tor_config_path" 2>/dev/null; then
-  hs_configured=1
-fi
+while IFS= read -r line; do
+  if toggle_site_tor_hidden_service_line_matches_site "$line"; then
+    hs_configured=1
+    break
+  fi
+done < "$tor_config_path"
 
 # Only do tor checks/prompts when enabling (hs_configured=0)
 if [ "$hs_configured" -eq 0 ]; then
@@ -137,9 +159,12 @@ esac
 
 # Check if this site already has a hidden service configured
 hs_configured=0
-if grep -q "^HiddenServiceDir.*${site_name}" "$tor_config_path" 2>/dev/null; then
-  hs_configured=1
-fi
+while IFS= read -r line; do
+  if toggle_site_tor_hidden_service_line_matches_site "$line"; then
+    hs_configured=1
+    break
+  fi
+done < "$tor_config_path"
 
 if [ "$hs_configured" -eq 1 ]; then
   # Site is configured - disable it automatically (user already clicked toggle)
@@ -148,7 +173,7 @@ if [ "$hs_configured" -eq 1 ]; then
     temp_torrc=$(mktemp)
     in_hs_block=0
     while IFS= read -r line; do
-      if printf '%s' "$line" | grep -q "^HiddenServiceDir.*${site_name}"; then
+      if toggle_site_tor_hidden_service_line_matches_site "$line"; then
         in_hs_block=1
         continue
       fi

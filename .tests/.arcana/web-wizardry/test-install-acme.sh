@@ -7,7 +7,7 @@ done
 
 test_install_acme_help() {
   _run_spell "spells/.arcana/web-wizardry/install-acme" --help
-  assert_success && assert_output_contains "Usage:"
+  assert_success && assert_output_contains "certbot"
 }
 
 _run_test_case "install-acme shows help" test_install_acme_help

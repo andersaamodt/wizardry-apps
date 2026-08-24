@@ -25,6 +25,15 @@ fi
 trap 'exit 130' INT
 trap 'exit 0' TERM
 
+# Ensure Gazeta is installed when the blog template is needed. Other template
+# sources are discovered directly from installed project checkouts.
+WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
+ensure_gazeta_cmd="$WIZARDRY_DIR/spells/.arcana/gazeta/install-gazeta"
+if ! create-from-template --resolve-template-dir blog >/dev/null 2>&1 && \
+  [ -x "$ensure_gazeta_cmd" ]; then
+  "$ensure_gazeta_cmd"
+fi
+
 # Prompt for site name
 printf 'Enter name for new site: '
 read -r site_name
@@ -42,26 +51,33 @@ fi
 
 # Template menu
 exit_label=$(exit-label)
-seen_templates=':'
-set --
-for template_root in "$WIZARDRY_DIR/templates/web" "$WIZARDRY_DIR/web"; do
-  [ -d "$template_root" ] || continue
-  for template_path in "$template_root"/*; do
-    [ -d "$template_path" ] || continue
-    template_name=$(basename "$template_path")
-    [ "$template_name" = ".themes" ] && continue
-    case "$template_name" in
-      ''|*[!a-zA-Z0-9_-]*) continue ;;
-    esac
-    case "$seen_templates" in
-      *:"$template_name":*) continue ;;
-    esac
-    seen_templates="${seen_templates}${template_name}:"
-    label=$(printf '%s' "$template_name" | tr '_' ' ' | tr '-' ' ')
-    set -- "$@" "${label}%create-from-template \"$site_name\" \"$template_name\""
-  done
-done
+available_templates=$(create-from-template --list-templates 2>/dev/null || printf '')
 
+if [ -z "$available_templates" ]; then
+  die "template-menu: no templates available"
+fi
+
+set --
+for template_name in $available_templates; do
+  case "$template_name" in
+    demo)
+      set -- "$@" \
+        "Demo Site (Interactive CGI demos)%web-wizardry create-from-template \"$site_name\" demo"
+      ;;
+    blog)
+      set -- "$@" \
+        "Personal Blog (Content-addressable posts)%web-wizardry create-from-template \"$site_name\" blog"
+      ;;
+    unix-settings)
+      set -- "$@" \
+        "UNIX Settings (Local system authority UI)%web-wizardry create-from-template \"$site_name\" unix-settings"
+      ;;
+    artificer)
+      set -- "$@" \
+        "Artificer (Local coding assistant)%web-wizardry create-from-template \"$site_name\" artificer"
+      ;;
+  esac
+done
 set -- "$@" "${exit_label}%kill -TERM \$PPID"
 
 menu "${BOLD}${CYAN}Select Template for '$site_name'" "$@" || menu_status=$?

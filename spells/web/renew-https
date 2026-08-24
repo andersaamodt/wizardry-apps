@@ -27,38 +27,32 @@ if [ -z "$site_name" ]; then
   die 2 "renew-https: SITENAME required"
 fi
 case "$site_name" in
-  ""|*[!A-Za-z0-9_-]*)
+  .|..|*[!a-zA-Z0-9._-]*)
     die 2 "renew-https: invalid site name"
     ;;
 esac
 
-WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
-SITES_DIR="$WEB_ROOT"
-SITE_DIR="$SITES_DIR/$site_name"
+web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+sites_dir="$web_root"
+site_dir="$sites_dir/$site_name"
 
-if [ ! -d "$SITE_DIR" ]; then
+if [ ! -d "$site_dir" ]; then
   die "renew-https: site '$site_name' not found"
 fi
 
-site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '-' '_')"
-site_user=$(config-get "$SITE_DIR/site.conf" site-user 2>/dev/null || printf '')
+site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '.-' '__')"
+site_user=$(config-get "$site_dir/site.conf" site-user 2>/dev/null || printf '')
 [ -z "$site_user" ] && site_user="$site_user_default"
+case "$site_user" in
+  ''|.|..|-*|*[!a-zA-Z0-9._-]*)
+    die 2 "renew-https: invalid site-user in site.conf"
+    ;;
+esac
 if [ -n "$site_user" ] && [ "$(id -un)" != "$site_user" ] && [ -z "${WIZARDRY_SITE_USER_REEXEC-}" ]; then
   if has sudo; then
     exec sudo -u "$site_user" -- env WIZARDRY_SITE_USER_REEXEC=1 "$0" "$site_name" "$@"
   fi
 fi
-
-# Get domain from config
-domain=$(config-get "$SITE_DIR/site.conf" domain 2>/dev/null || echo "")
-if [ -z "$domain" ] || [ "$domain" = "localhost" ]; then
-  die "renew-https: valid domain required"
-fi
-case "$domain" in
-  ''|*[!A-Za-z0-9._-]*)
-    die 2 "renew-https: invalid domain"
-    ;;
-esac
 
 # Check for certbot
 if ! has certbot; then
@@ -67,6 +61,12 @@ if ! has certbot; then
   info "On Debian/Ubuntu: sudo apt-get install certbot"
   info "On macOS: brew install certbot"
   exit 1
+fi
+
+# Get domain from config
+domain=$(config-get "$site_dir/site.conf" domain 2>/dev/null || echo "")
+if [ -z "$domain" ] || [ "$domain" = "localhost" ]; then
+  die "renew-https: valid domain required"
 fi
 
 # Check if HTTPS is configured

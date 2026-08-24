@@ -7,7 +7,7 @@ done
 
 test_toggle_all_web_wizardry_help() {
   run_spell "spells/.arcana/web-wizardry/toggle-all-web-wizardry" --help
-  assert_success && assert_output_contains "Usage:"
+  assert_success && assert_output_contains "certbot"
 }
 
 run_test_case "toggle-all-web-wizardry shows help" test_toggle_all_web_wizardry_help

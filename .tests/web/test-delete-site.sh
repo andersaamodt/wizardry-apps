@@ -13,32 +13,27 @@ test_delete_site_help() {
   assert_output_contains "Usage:"
 }
 
-test_delete_site_rejects_path_traversal() {
+test_delete_site_rejects_path_shaped_site_name() {
   skip-if-compiled || return $?
 
-  test_web_root=$(temp-dir web-wizardry-test)
-  outside_dir="$(dirname "$test_web_root")/wizardry-delete-escape-$$"
-  rm -rf "$outside_dir"
-  mkdir -p "$outside_dir"
-  printf 'site-name=outside\nsite-user=%s\n' "$(id -un)" > "$outside_dir/site.conf"
+  tmpdir=$(make_tempdir)
+  sites_dir="$tmpdir/sites"
+  escape_dir="$tmpdir/escape"
+  mkdir -p "$sites_dir" "$escape_dir"
+  printf '%s\n' keep > "$escape_dir/keep"
 
-  run_cmd sh -c 'printf "y\n" | WIZARDRY_SITES_DIR="$1" "$2/spells/web/delete-site" "../$3"' \
-    sh "$test_web_root" "$ROOT_DIR" "$(basename "$outside_dir")"
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$outside_dir"
-    return 1
-  }
+  WIZARDRY_SITES_DIR="$sites_dir" run_cmd sh -c \
+    "printf 'y\n' | '$ROOT_DIR/spells/web/delete-site' ../escape"
 
-  [ -d "$outside_dir" ] || {
+  assert_failure || return 1
+  assert_error_contains "invalid site name" || return 1
+  if [ ! -f "$escape_dir/keep" ]; then
     TEST_FAILURE_REASON="delete-site removed a directory outside WIZARDRY_SITES_DIR"
-    rm -rf "$test_web_root" "$outside_dir"
     return 1
-  }
-
-  rm -rf "$test_web_root" "$outside_dir"
+  fi
 }
 
 run_test_case "delete-site --help" test_delete_site_help
-run_test_case "delete-site rejects path traversal" test_delete_site_rejects_path_traversal
+run_test_case "delete-site rejects path-shaped site names" test_delete_site_rejects_path_shaped_site_name
 
 finish_tests
